@@ -1,7 +1,83 @@
 let fs = require('fs')
 let request = require('request')
 let md5 = require('js-md5')
+let moment = require('moment')
 const Sequelize = require('sequelize')
+
+/*const sequelize = new Sequelize('shoes', 'root', 'qiao@1982', {
+  host: 'localhost',
+  dialect: 'mysql',
+
+  pool: {
+    max: 5,
+    min: 0,
+    idle: 10000
+  },
+  define: {
+    timestamps: false
+  },
+})*/
+const sequelize = new Sequelize('shoes', 'mysql', 'zj_tech@321678', {
+  host: '5843080a34d43.gz.cdb.myqcloud.com',
+  dialect: 'mysql',
+  port: '5274',
+
+  pool: {
+    max: 5,
+    min: 0,
+    idle: 10000
+  },
+  define: {
+    timestamps: false
+  },
+})
+
+const SPU = sequelize.define('spus', {
+  id: {
+    type: Sequelize.INTEGER,
+    primaryKey: true,
+  },
+  product_no: {
+    type: Sequelize.STRING,
+  },
+  keyword_ebay: {
+    type: Sequelize.STRING,
+  }
+})
+
+const SpiderLog = sequelize.define('ebay_spider_log', {
+  id: {
+    type: Sequelize.INTEGER,
+    primaryKey: true,
+  },
+  keyword: {
+    type: Sequelize.STRING,
+  },
+  product_name: {
+    type: Sequelize.STRING,
+  },
+  deal_date: {
+    type: Sequelize.STRING,
+  },
+  deal_price: {
+    type: Sequelize.DECIMAL,
+  },
+  size_id: {
+    type: Sequelize.DOUBLE,
+  },
+  deal_no: {
+    type: Sequelize.STRING,
+  },
+  spu_id: {
+    type: Sequelize.INTEGER,
+  },
+  aspect: {
+    type: Sequelize.TEXT,
+  },
+  content: {
+    type: Sequelize.TEXT,
+  }
+})
 
 /**
  * @desc 获取ebay api搜索结果，该版本写csv文件
@@ -94,35 +170,12 @@ function makeURL(page_number, on_going, min_price, query_string, fromdate, todat
 }
 
 function writeHead(file) {
-  //let headString = `no,autoPay,conditionDisplayName,conditionId`
-  //headString += `,country,galleryURL,globalId,isMultiVariationListing,itemId,bestOfferEnabled,buyItNowAvailable,endTime,gift,listingType,startTime`
-
-  //headString += `,loc,paymentMethod,categoryId,categoryName,returnsAccepted`
-
-  //headString += `,convertedCurrentPrice['@currencyId'],convertedCurrentPrice['__value__']`
-  //headString += `,currentPrice['@currencyId'],currentPrice['__value__']`
-  //headString += `,sellingState,expeditedShipping,handlingTime,oneDayShippingAvailable,shipToLocations`
-
-  //rowString += `,shippingServiceCost[0]['@currencyId'],shippingServiceCost[0]['__value__']`
-  //headString += `,shippingType,title,topRatedListing,viewItemURL`
-
-  let headString = `no,title,itemId,startTime,endTime,currentPrice['@currencyId'],currentPrice['__value__'],sellingState,listingType,handlingTime,md5`
+  let headString = `no,title,itemId,startTime,endTime,currentPrice['@currencyId'],currentPrice['__value__'],sellingState,listingType,md5`
   fs.appendFileSync(file, headString + "\n")
 }
 
-function writeRecord(file, record, no) {
+function writeRecord(file, record, no, aspectHistogramContainer, query_string) {
   let {
-    autoPay: [ autoPay ],
-    condition: [
-      {
-        conditionDisplayName: [ conditionDisplayName ],
-        conditionId: [ conditionId ],
-      }
-    ],
-    country: [ country ],
-    galleryURL: [ galleryURL ],
-    globalId: [ globalId ],
-    isMultiVariationListing: [ isMultiVariationListing ],
     itemId: [ itemId ],
     listingInfo: [
       {
@@ -134,52 +187,48 @@ function writeRecord(file, record, no) {
         startTime: [ startTime ],
       }
     ],
-    location: [ loc ],
-    paymentMethod: [ paymentMethod ],
-    primaryCategory: [
-      {
-        categoryId: [ categoryId ],
-        categoryName: [ categoryName ],
-      }
-    ],
     returnsAccepted: [ returnsAccepted ],
     sellingStatus: [{
       convertedCurrentPrice: [ convertedCurrentPrice ],  // 这里价格是对象，里边有两个值 @currencyId和__value__
       currentPrice: [ currentPrice ], // 这里价格是对象，有两个值 @currencyId和__value__
       sellingState: [ sellingState ],
     }],
-    shippingInfo: [{
-      expeditedShipping: [ expeditedShipping ],
-      handlingTime: [ handlingTime ],
-      oneDayShippingAvailable: [ oneDayShippingAvailable ],
-      shipToLocations: [ shipToLocations ],
-      shippingServiceCost,
-//              shippingServiceCost: [ shippingServiceCost ],
-      shippingType: [ shippingType ],
-    }],
     title: [ title ],
     topRatedListing: [ topRatedListing ],
-    viewItemURL: [ viewItemURL ],
   } = record
 
   let md5string = md5(JSON.stringify(record))
-  /*let rowString = `${no},${autoPay},${conditionDisplayName},${conditionId}`
-  rowString += `,${country},${galleryURL},${globalId},${isMultiVariationListing},${itemId},${bestOfferEnabled},${buyItNowAvailable},${endTime},${gift},${listingType},${startTime}`
-
-  rowString += `,${loc},${paymentMethod},${categoryId},${categoryName},${returnsAccepted}`
-
-  rowString += `,${convertedCurrentPrice['@currencyId']},${convertedCurrentPrice['__value__']}`
-  rowString += `,${currentPrice['@currencyId']},${currentPrice['__value__']}`
-  rowString += `,${sellingState},${expeditedShipping},${handlingTime},${oneDayShippingAvailable},${shipToLocations}`
-
-  //rowString += `,${shippingServiceCost[0]['@currencyId']},${shippingServiceCost[0]['__value__']}`
-  rowString += `,${shippingType},${title},${topRatedListing},${viewItemURL}`*/
 
   // 将文本中的,替换为中文逗号，csv格式
   title = title.replace(/,/g, "，")
-  let rowString = `${no},${title},${itemId},${startTime},${endTime},${currentPrice['@currencyId']},${currentPrice['__value__']},${sellingState},${listingType},${handlingTime},${md5string}`
+  let rowString = `${no},${title},${itemId},${startTime},${endTime},${currentPrice['@currencyId']},${currentPrice['__value__']},${sellingState},${listingType},${md5string}`
 
   fs.appendFileSync(file, rowString + "\n")
+/**
+  `last_time` datetime DEFAULT NULL,
+  `keyword` varchar(64) NOT NULL,
+  `product_name` varchar(255) NOT NULL COMMENT '产品名称',
+  `deal_date` varchar(64) NOT NULL COMMENT '成交时间',
+  `deal_price` decimal(10,0) NOT NULL COMMENT '成交价',
+  `size_id` double NOT NULL COMMENT '尺码',
+  `spu_id` int(11) NOT NULL COMMENT '产品id',
+  `content` longtext COMMENT '整行数据',
+ */
+
+
+  let logRecord = SpiderLog.build({
+    keyword: query_string,
+    product_name: title,
+    deal_date: startTime,
+    deal_price: currentPrice['__value__'],
+    size_id: 0,
+    spu_id: 0,
+    deal_no: itemId,
+    aspect: JSON.stringify(aspectHistogramContainer),
+    content: JSON.stringify(record),
+  })
+
+  logRecord.save()
 }
 function makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name) {
   let url = makeURL(page_number, on_going, min_price, query_string, fromdate, todate, app_name)
@@ -235,7 +284,9 @@ function makeRequest(page_number, on_going, min_price, query_string, fromdate, t
       item.map(function(record, index){
         let no = entriesPerPage * (page_number - 1) + index + 1
         console.log('write row ', no)
-        writeRecord(outputfile, record, no)
+        if(record) {
+          writeRecord(outputfile, record, no, aspectHistogramContainer, query_string)
+        }
       })
 
       if(page_number < totalPages) { // 如果还有记录，继续请求
@@ -270,45 +321,18 @@ function task(query_string, start, end, min_price) {
 }
 
 
-const sequelize = new Sequelize('shoes', 'root', 'qiao@1982', {
-  host: 'localhost',
-  dialect: 'mysql',
-
-  pool: {
-    max: 5,
-    min: 0,
-    idle: 10000
-  },
-  define: {
-    timestamps: false
-  },
-})
-const SPU = sequelize.define('spus', {
-  id: {
-    type: Sequelize.INTEGER,
-    primaryKey: true,
-  },
-  product_no: {
-    type: Sequelize.STRING,
-  },
-  keyword_ebay: {
-    type: Sequelize.STRING,
-  }
-})
-
 SPU.findAll().then(items => {
   items.map(item => {
-    let {
-      keyword_ebay: keyword,
-    } = item
-
-    let start = '01 20,2016'
+    let keyword_ebay = item.keyword_ebay
+    console.log(item, keyword_ebay)
+    let start = '01 20,2017'
     let end = '06 20,2017'
-    let min_price = 150
+    let min_price = 200
     // 查询关键词
-    keyword_ebay = 'Jordan 4 pure money'
+//    keyword_ebay = 'Jordan 4 pure money'
+//    keyword_ebay = 'nike supreme uptempo black'
     task(keyword_ebay, start, end, min_price)
   })
 }).then(() => {
-  sequelize.close()
+  //sequelize.close()
 })

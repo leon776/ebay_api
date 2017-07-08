@@ -1,8 +1,6 @@
 let fs = require('fs')
 let request = require('request')
-let md5 = require('js-md5')
-const Sequelize = require('sequelize')
-
+let mysql = require('mysql2')
 /**
  * @desc 获取ebay api搜索结果，该版本写csv文件
  *
@@ -10,6 +8,24 @@ const Sequelize = require('sequelize')
  */
 
 let outputfile = './output.csv'
+
+
+let connection = mysql.createConnection({
+  host     : '5843080a34d43.gz.cdb.myqcloud.com',
+  user     : 'mysql',
+  port     : 5274,
+  password : 'zj_tech@321678',
+  database : 'shoes',
+})
+
+connection.query(
+  'SELECT * FROM spus',
+  function(err, results, fields) {
+    console.log(results); // results contains rows returned by server
+    console.log(fields); // fields contains extra meta data about results, if available
+  }
+)
+process.exit()
 
 /**
  * @desc 根据页面数、最低价、关键词、开始日期、结束日期产生请求API的URL
@@ -106,7 +122,7 @@ function writeHead(file) {
   //rowString += `,shippingServiceCost[0]['@currencyId'],shippingServiceCost[0]['__value__']`
   //headString += `,shippingType,title,topRatedListing,viewItemURL`
 
-  let headString = `no,title,itemId,startTime,endTime,currentPrice['@currencyId'],currentPrice['__value__'],sellingState,listingType,handlingTime,md5`
+  let headString = `no,title,itemId,startTime,endTime,currentPrice['@currencyId'],currentPrice['__value__'],sellingState,listingType,handlingTime`
   fs.appendFileSync(file, headString + "\n")
 }
 
@@ -162,7 +178,6 @@ function writeRecord(file, record, no) {
     viewItemURL: [ viewItemURL ],
   } = record
 
-  let md5string = md5(JSON.stringify(record))
   /*let rowString = `${no},${autoPay},${conditionDisplayName},${conditionId}`
   rowString += `,${country},${galleryURL},${globalId},${isMultiVariationListing},${itemId},${bestOfferEnabled},${buyItNowAvailable},${endTime},${gift},${listingType},${startTime}`
 
@@ -177,7 +192,7 @@ function writeRecord(file, record, no) {
 
   // 将文本中的,替换为中文逗号，csv格式
   title = title.replace(/,/g, "，")
-  let rowString = `${no},${title},${itemId},${startTime},${endTime},${currentPrice['@currencyId']},${currentPrice['__value__']},${sellingState},${listingType},${handlingTime},${md5string}`
+  let rowString = `${no},${title},${itemId},${startTime},${endTime},${currentPrice['@currencyId']},${currentPrice['__value__']},${sellingState},${listingType},${handlingTime}`
 
   fs.appendFileSync(file, rowString + "\n")
 }
@@ -186,21 +201,17 @@ function makeRequest(page_number, on_going, min_price, query_string, fromdate, t
   console.log('Begin request :', url)
   request({uri:url}, function(err, response, body) {
     let json = JSON.parse(body)
-/**
-{ findCompletedItemsResponse:
-   [ { ack: [Object],
-       version: [Object],
-       timestamp: [Object],
-       searchResult: [Object],
-       paginationOutput: [Object] } ] }
- */
     // 首先从响应中拿出各个属性
-    console.log(json)
     let {
       findCompletedItemsResponse: [
         {
           ack,
-          aspectHistogramContainer,
+          aspectHistogramContainer: [
+            {
+              aspect,
+              domainDisplayName: [ domainDisplayName ],
+            }
+          ],
           paginationOutput: [
             {
               pageNumber: [ pageNumber ],
@@ -216,17 +227,10 @@ function makeRequest(page_number, on_going, min_price, query_string, fromdate, t
       ]
     } = json
 
-    if(aspectHistogramContainer) {
-      let [
-         {
-           aspect,
-           domainDisplayName: [ domainDisplayName ],
-         }
-      ] = aspectHistogramContainer
-    }
     let [resStatus] = ack
 
     if(resStatus === 'Success') { // 请求成功
+      console.log(aspect)
       let count = searchResult[0]['@count'] // 含有特殊符号，直接取出
       let [
         { item },
@@ -238,7 +242,7 @@ function makeRequest(page_number, on_going, min_price, query_string, fromdate, t
         writeRecord(outputfile, record, no)
       })
 
-      if(page_number < totalPages) { // 如果还有记录，继续请求
+      if(page_number <= totalPages) { // 如果还有记录，继续请求
         page_number++
         makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name)
       }
@@ -247,68 +251,36 @@ function makeRequest(page_number, on_going, min_price, query_string, fromdate, t
   })
 }
 
-function task(query_string, start, end, min_price) {
-  // 开始页码
-  let page_number = 1
 
-  // unkwown
-  let on_going = false
+// 开始时间
+let start = '05 20,2017'
 
+// 结束时间
+let end = '06 20,2017'
 
-  let fromdate = (new Date(start)).toISOString()
-  let todate = (new Date(end)).toISOString()
+// 开始页码
+let page_number = 1
 
-  // API token
-  let app_name = 'davidkwa-bidtify-PRD-645f30466-13f9307d'
+// unkwown
+let on_going = false
 
-  // 先删除原来文件
-  fs.unlinkSync(outputfile)
-  // 写表头
-  writeHead(outputfile)
-  // 请求数据，写表体
-  makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name)
-}
+// 最低价设置
+let min_price = 160
 
+// 查询关键词
+let query_string = 'Jordan 4 pure money'
 
-const sequelize = new Sequelize('shoes', 'root', 'qiao@1982', {
-  host: 'localhost',
-  dialect: 'mysql',
+query_string = 'Jordan 11 low closing ceremony'
 
-  pool: {
-    max: 5,
-    min: 0,
-    idle: 10000
-  },
-  define: {
-    timestamps: false
-  },
-})
-const SPU = sequelize.define('spus', {
-  id: {
-    type: Sequelize.INTEGER,
-    primaryKey: true,
-  },
-  product_no: {
-    type: Sequelize.STRING,
-  },
-  keyword_ebay: {
-    type: Sequelize.STRING,
-  }
-})
+let fromdate = (new Date(start)).toISOString()
+let todate = (new Date(end)).toISOString()
 
-SPU.findAll().then(items => {
-  items.map(item => {
-    let {
-      keyword_ebay: keyword,
-    } = item
+// API token
+let app_name = 'davidkwa-bidtify-PRD-645f30466-13f9307d'
 
-    let start = '01 20,2016'
-    let end = '06 20,2017'
-    let min_price = 150
-    // 查询关键词
-    keyword_ebay = 'Jordan 4 pure money'
-    task(keyword_ebay, start, end, min_price)
-  })
-}).then(() => {
-  sequelize.close()
-})
+// 先删除原来文件
+fs.unlinkSync(outputfile)
+// 写表头
+writeHead(outputfile)
+// 请求数据，写表体
+makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name)
