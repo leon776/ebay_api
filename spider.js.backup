@@ -3,7 +3,7 @@ let request = require('request')
 let moment = require('moment')
 const Sequelize = require('sequelize')
 
-/*const sequelize = new Sequelize('shoes', 'mysql', 'zj_tech@321678', {
+const sequelize = new Sequelize('shoes', 'mysql', 'zj_tech@321678', {
   host: '5843080a34d43.gz.cdb.myqcloud.com',
   dialect: 'mysql',
   port: '5274',
@@ -16,23 +16,7 @@ const Sequelize = require('sequelize')
   define: {
     timestamps: false
   },
-})*/
-
-const sequelize = new Sequelize('shoes', 'root', 'qiao@1982', {
-  host: 'localhost',
-  dialect: 'mysql',
-  port: '3306',
-
-  pool: {
-    max: 5,
-    min: 0,
-    idle: 1000
-  },
-  define: {
-    timestamps: false
-  },
 })
-
 //const sequelize = new Sequelize('mysql://mysql:5843080a34d43.gz.cdb.myqcloud.com:5274/shoes')
 
 const SPU = sequelize.define('spus', {
@@ -65,9 +49,6 @@ const SpiderLog = sequelize.define('ebay_spider_log', {
   deal_price: {
     type: Sequelize.DECIMAL,
   },
-  brand: {
-    type: Sequelize.STRING,
-  },
   size_name: {
     type: Sequelize.STRING,
   },
@@ -75,7 +56,7 @@ const SpiderLog = sequelize.define('ebay_spider_log', {
     type: Sequelize.STRING,
   },
   size_id: {
-    type: Sequelize.STRING,
+    type: Sequelize.DOUBLE,
   },
   deal_no: {
     type: Sequelize.STRING,
@@ -165,7 +146,7 @@ function makeURL(page_number, on_going, min_price, query_string, fromdate, todat
   return url;
 }
 
-function searchAspect(baseUrl, query_string, spuid, brand) {
+function searchAspect(baseUrl, query_string) {
   let page_number = 1
   // step 1: 获取aspect histogram
   url = baseUrl + "&outputSelector(0)=AspectHistogram"
@@ -235,7 +216,7 @@ function searchAspect(baseUrl, query_string, spuid, brand) {
             return count + parseInt(item['count'][0], 10)
           }, 0)
           // 使用美码进行二次搜索
-          searchWithSizes(baseUrl, valueHistogram, name, 1, query_string, spuid, brand)
+          searchWithSizes(baseUrl, valueHistogram, name, 1, query_string)
         }
 
         if(euroSizes) {
@@ -247,7 +228,7 @@ function searchAspect(baseUrl, query_string, spuid, brand) {
           }, 0)
 
           // 使用欧码进行二次搜索
-          searchWithSizes(baseUrl, eurovalueHistogram, euroname, 1, query_string, spuid, brand)
+          searchWithSizes(baseUrl, eurovalueHistogram, euroname, 1, query_string)
         }
 
         console.log('============================== search ok =====================================')
@@ -258,115 +239,104 @@ function searchAspect(baseUrl, query_string, spuid, brand) {
   })
 }
 
-function searchWithSizes(baseUrl, sizes, name, page_number, query_string, spuid, brand) {
+function searchWithSizes(baseUrl, sizes, name, page_number, query_string) {
   let url = baseUrl + "&paginationInput.pageNumber=" + page_number;
   url += "&paginationInput.entriesPerPage=100";
 
+  sizes.map(item => {
+    let sizeValue = item['@valueName']
+    if(sizeValue !== 'Not Specified') {
+      url = `${url}&aspectFilter(0).aspectName=${name}&aspectFilter(0).aspectValueName=${sizeValue}`
+      console.log(`Begin search with ${name}: ${url}`)
+      request({uri: url}, function(err, response, body) {
+        let json = JSON.parse(body)
+        let {
+          findCompletedItemsResponse: [
+            {
+              ack: [
+                retStatus,
+              ],
+              paginationOutput: [
+                {
+                  pageNumber: [ pageNumber ],
+                  entriesPerPage: [ entriesPerPage ],
+                  totalPages: [ totalPages ],
+                  totalEntries: [ totalEntries ],
+                }
+              ],
+              searchResult,
+              timestamp,
+              version,
+            }
+          ]
+        } = json
 
-  //brands.map(brand => {
-    sizes.map(item => {
-      let sizeValue = item['@valueName']
-      //let brandValue = brand['@valueName']
-      if(sizeValue !== 'Not Specified') {
-        url = `${url}&aspectFilter(0).aspectName=${name}&aspectFilter(0).aspectValueName=${sizeValue}`
-        //url = `${url}&aspectFilter(1).aspectName=Brand&aspectFilter(1).aspectValueName=${brandValue}`
+        console.log(`Search with size ${name} - ${sizeValue}'s total items is ${totalEntries}`)
 
-        console.log(`Begin search with ${name}: ${url}`)
-        request({uri: url}, function(err, response, body) {
-          let json = JSON.parse(body)
-          let {
-            findCompletedItemsResponse: [
-              {
-                ack: [
-                  retStatus,
-                ],
-                paginationOutput: [
+        if(retStatus === 'Success') {
+          let count = searchResult[0]['@count'] // 含有特殊符号，直接取出
+          let [
+            { item },
+          ] = searchResult
+
+          item && item.map(function(record, index){
+            let no = entriesPerPage * (page_number - 1) + index + 1
+            if(record) {
+              let {
+                itemId: [ itemId ],
+                listingInfo: [
                   {
-                    pageNumber: [ pageNumber ],
-                    entriesPerPage: [ entriesPerPage ],
-                    totalPages: [ totalPages ],
-                    totalEntries: [ totalEntries ],
+                    bestOfferEnabled: [ bestOfferEnabled ],
+                    buyItNowAvailable: [ buyItNowAvailable ],
+                    endTime: [ endTime ],
+                    gift: [ gift ],
+                    listingType: [ listingType ],
+                    startTime: [ startTime ],
                   }
                 ],
-                searchResult,
-                timestamp,
-                version,
-              }
-            ]
-          } = json
+                returnsAccepted: [ returnsAccepted ],
+                sellingStatus: [{
+                  convertedCurrentPrice: [ convertedCurrentPrice ],  // 这里价格是对象，里边有两个值 @currencyId和__value__
+                  currentPrice: [ currentPrice ], // 这里价格是对象，有两个值 @currencyId和__value__
+                  sellingState: [ sellingState ],
+                }],
+                title: [ title ],
+                topRatedListing: [ topRatedListing ],
+              } = record
+              let logRecord = SpiderLog.build({
+                keyword: query_string,
+                product_name: title,
+                deal_date: startTime,
+                deal_price: currentPrice['__value__'],
+                size_name: name,
+                size: sizeValue,
+                size_id: sizeValue,
+                spu_id: 0,
+                deal_no: itemId,
+                aspect: JSON.stringify(sizes),
+                content: JSON.stringify(record),
+              })
 
-          console.log(`Search with size ${name} - ${sizeValue}'s total items is ${totalEntries}`)
-
-          if(retStatus === 'Success') {
-            let count = searchResult[0]['@count'] // 含有特殊符号，直接取出
-            let [
-              { item },
-            ] = searchResult
-
-            item && item.map(function(record, index){
-              let no = entriesPerPage * (page_number - 1) + index + 1
-              if(record) {
-                let {
-                  itemId: [ itemId ],
-                  listingInfo: [
-                    {
-                      bestOfferEnabled: [ bestOfferEnabled ],
-                      buyItNowAvailable: [ buyItNowAvailable ],
-                      endTime: [ endTime ],
-                      gift: [ gift ],
-                      listingType: [ listingType ],
-                      startTime: [ startTime ],
-                    }
-                  ],
-                  returnsAccepted: [ returnsAccepted ],
-                  sellingStatus: [{
-                    convertedCurrentPrice: [ convertedCurrentPrice ],  // 这里价格是对象，里边有两个值 @currencyId和__value__
-                    currentPrice: [ currentPrice ], // 这里价格是对象，有两个值 @currencyId和__value__
-                    sellingState: [ sellingState ],
-                  }],
-                  title: [ title ],
-                  topRatedListing: [ topRatedListing ],
-                } = record
-                let logRecord = SpiderLog.build({
-                  keyword: query_string,
-                  product_name: title,
-                  deal_date: startTime,
-                  deal_price: currentPrice['__value__'],
-                  brand: brand,
-                  size_name: name,
-                  size: sizeValue,
-                  size_id: sizeValue,
-                  spu_id: spuid,
-                  deal_no: itemId,
-                  aspect: JSON.stringify(sizes),
-                  content: JSON.stringify(record),
-                })
-
-                logRecord.save()
-              }
-            })
-
-            if(page_number < totalPages) { // 如果还有记录，继续请求
-              page_number++
-              searchWithSizes(baseUrl, sizes, name, page_number, query_string)
+              console.log('saving....................', logRecord.save())
             }
+          })
+
+          if(page_number < totalPages) { // 如果还有记录，继续请求
+            page_number++
+            searchWithSizes(baseUrl, sizes, name, page_number, query_string)
           }
-        })
-      }
-    })
-
-
-
-
-//  })
+        }
+      })
+    }
+  })
 }
-function makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name, spuid, brand) {
+function makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name) {
   let url = makeURL(page_number, on_going, min_price, query_string, fromdate, todate, app_name)
 
-  searchAspect(url, query_string, spuid, brand)
+  searchAspect(url, query_string)
 }
 
-function runSearch(query_string, start, end, min_price, spuid, brand) {
+function runSearch(query_string, start, end, min_price) {
   // 开始页码
   let page_number = 1
 
@@ -381,13 +351,13 @@ function runSearch(query_string, start, end, min_price, spuid, brand) {
   let app_name = 'davidkwa-bidtify-PRD-645f30466-13f9307d'
 
   // 请求数据，写表体
-  makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name, spuid, brand)
+  makeRequest(page_number, on_going, min_price, query_string, fromdate, todate, app_name)
 }
 
-module.exports = runSearch
-/*let keyword_ebay = 'Jordan 4 pure money'
-//keyword_ebay = 'Jordan 11 low infrared'
+
+let keyword_ebay = 'Jordan 4 pure money'
+keyword_ebay = 'Jordan 11 low infrared'
 let start = '01 20,2017'
 let end = '06 20,2017'
 let min_price = 100
-runSearch(keyword_ebay, start, end, min_price)*/
+runSearch(keyword_ebay, start, end, min_price)
