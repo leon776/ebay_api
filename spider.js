@@ -3,7 +3,7 @@ let request = require('request')
 let moment = require('moment')
 const Sequelize = require('sequelize')
 
-/*const sequelize = new Sequelize('shoes', 'mysql', 'zj_tech@321678', {
+const sequelize = new Sequelize('shoes', 'mysql', 'zj_tech@321678', {
   host: '5843080a34d43.gz.cdb.myqcloud.com',
   dialect: 'mysql',
   port: '5274',
@@ -16,24 +16,7 @@ const Sequelize = require('sequelize')
   define: {
     timestamps: false
   },
-})*/
-
-const sequelize = new Sequelize('shoes', 'root', 'qiao@1982', {
-  host: 'localhost',
-  dialect: 'mysql',
-  port: '3306',
-
-  pool: {
-    max: 5,
-    min: 0,
-    idle: 1000
-  },
-  define: {
-    timestamps: false
-  },
 })
-
-//const sequelize = new Sequelize('mysql://mysql:5843080a34d43.gz.cdb.myqcloud.com:5274/shoes')
 
 const SPU = sequelize.define('spus', {
   id: {
