@@ -281,7 +281,7 @@ function makeRequest(page_number, on_going, min_price, query_string, fromdate, t
         { item },
       ] = searchResult
 
-      item.map(function(record, index){
+      item && item.map(function(record, index){
         let no = entriesPerPage * (page_number - 1) + index + 1
         console.log('write row ', no)
         if(record) {
@@ -321,7 +321,7 @@ function task(query_string, start, end, min_price) {
 }
 
 
-SPU.findAll().then(items => {
+/*SPU.findAll().then(items => {
   items.map(item => {
     let keyword_ebay = item.keyword_ebay
     console.log(item, keyword_ebay)
@@ -335,4 +335,15 @@ SPU.findAll().then(items => {
   })
 }).then(() => {
   //sequelize.close()
-})
+})*/
+
+let keyword_ebay = 'Adidas EQT 93/17 core black turbo'
+
+keyword_ebay = 'supreme Nike Air More Uptempo sz10.5 black'
+keyword_ebay = 'Air Jordan 4 IV Retro Pure Money Authentic With Receipt White Silver Size 10'
+keyword_ebay = 'Air Jordan'
+let start = '01 20,2017'
+let end = '06 20,2017'
+let min_price = 20
+task(keyword_ebay, start, end, min_price)
+
