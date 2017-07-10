@@ -6,7 +6,31 @@ import sys
 import requests
 import time
 import datetime
+import csv
+import json
+import pymysql
+import os
 
+def connection():
+    db = pymysql.connect(
+        host = "127.0.0.1",
+        port = 3306,
+        user = "root",
+        password = "qiao@1982",
+        db = "shoes",
+        cursorclass = pymysql.cursors.DictCursor,
+    )
+
+    return db
+
+def close_db(db):
+    db.close()
+
+
+table_name = 'ebay_spider_logs'
+
+conn = connection()
+cursor = conn.cursor()
 '''
 @desc 根据关键词、开始时间、结束时间、最低价等产生搜索URL
 @param query_sting String: 请求关键词
@@ -105,28 +129,103 @@ def searchWithSizes(
         keyword,
         spuid,
         brand,
+        file,
         page_number = 1
     ):
+
 
     baseURL = '{url}&paginationInput.pageNumber={page_number}&paginationInput.entriesPerPage=100'.format(
         page_number = page_number,
         url = url
     )
 
+    records = []
     for k, size in enumerate(sizes):
-        sizeURL = getSizeUrl(url, name, size['@valueName'])
+        sizeValue = size['@valueName']
+        sizeURL = getSizeUrl(url, name, sizeValue)
         print(sizeURL)
         response = requests.get(sizeURL)
         if response.status_code == requests.codes.ok:
             result = response.json()['findCompletedItemsResponse'][0]
             ack = result['ack'][0]
-            print(ack)
 
+            if(ack == 'Success'):
+                searchResult = result['searchResult'][0]
+                paginationOutput = result['paginationOutput'][0]
+                entriesPerPage = int(paginationOutput['entriesPerPage'][0])
+                totalPages = int(paginationOutput['totalPages'][0])
+                totalEntries = int(paginationOutput['totalEntries'][0])
+                item = searchResult['item']
+
+                print(paginationOutput, entriesPerPage, totalPages, totalEntries, item)
+                if(len(item) > 0):
+                    with open(file, 'a+') as csvfile:
+                        spamwriter = csv.writer(csvfile, delimiter = '|')
+                        for index, record in enumerate(item):
+                            itemId = record['itemId'][0]
+                            listingInfo = record['listingInfo'][0]
+                            sellingStatus = record['sellingStatus'][0]
+                            title = record['title'][0]
+
+                            currentPrice = sellingStatus['currentPrice'][0]['__value__']
+                            currencyId = sellingStatus['currentPrice'][0]['@currencyId']
+                            startTime = listingInfo['startTime'][0]
+                            endTime = listingInfo['endTime'][0]
+
+                            rowDict = {
+                                "keyword": keyword,
+                                "product_name": title,
+                                "deal_date": startTime,
+                                "currency": currencyId,
+                                "deal_price": currentPrice,
+                                "size_name": name,
+                                "brand": brand,
+                                "size": sizeValue,
+                                "size_id": sizeValue,
+                                "deal_no": itemId,
+                                "spu_id": spuid,
+                                "aspect": json.dumps(sizes, sort_keys = True),
+                                "content": json.dumps(record, sort_keys = True)
+                            }
+                            records.append(rowDict)
+                            insertSQL = 'INSERT INTO %s (keyword, product_name, deal_date, currency, deal_price, size_name, brand, size, size_id, deal_no, spu_id, aspect, content) VALUES ("%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s")' % (table_name, pymysql.escape_string(keyword), pymysql.escape_string(title), startTime, currencyId, currentPrice, name, brand, sizeValue, sizeValue, itemId, spuid, pymysql.escape_string(json.dumps(sizes, sort_keys = True)), pymysql.escape_string(json.dumps(record, sort_keys = True)))
+                            print(insertSQL)
+                            cursor.execute(insertSQL)
+                            spamwriter.writerow([
+                                keyword,
+                                title,
+                                startTime,
+                                currencyId,
+                                currentPrice,
+                                name,
+                                brand,
+                                sizeValue,
+                                sizeValue,
+                                spuid,
+                                itemId,
+                                json.dumps(sizes, sort_keys = True),
+                                json.dumps(record, sort_keys = True)
+                            ])
+
+                    # 必需commit才能到数据库中
+                    conn.commit()
+                    print(sizeURL, len(records), page_number, totalPages)
+                    if(page_number < totalPages):
+                        page_number = page_number + 1
+                        searchWithSizes(
+                            url = sizeURL,
+                            sizes = sizes,
+                            name = name,
+                            keyword = keyword,
+                            spuid = spuid,
+                            brand = brand,
+                            page_number = page_number
+                        )
 
 '''
 @desc 发送请求
 '''
-def makeRequest(keyword, start, end, price, spuid, brand, page_number = 1):
+def makeRequest(keyword, start, end, price, spuid, brand, file, page_number = 1):
     url = makeURL(
         query_string = keyword,
         min_price = price,
@@ -174,7 +273,8 @@ def makeRequest(keyword, start, end, price, spuid, brand, page_number = 1):
                     keyword = keyword,
                     spuid = spuid,
                     brand = brand,
-                    page_number = page_number
+                    page_number = page_number,
+                    file = outfile
                 )
 
             # 遍历欧码
@@ -186,16 +286,58 @@ def makeRequest(keyword, start, end, price, spuid, brand, page_number = 1):
                     keyword = keyword,
                     spuid = spuid,
                     brand = brand,
-                    page_number = page_number
+                    page_number = page_number,
+                    file = outfile
                 )
 
             # Not Specified ??
 
+keyword = 'Jordan 4 pure money'
+start = '01/20,2017'
+end = '07/01,2017'
+price = 200
+spuid = 11
+brand = 'Nike'
+
+cwd = os.getcwd()
+outfile = 'output_{spuid}_{start}_{end}_{price}.data'.format(
+    spuid = spuid,
+    start = start,
+    end = end,
+    price = price,
+).replace(',', '').replace('/', '')
+
+outfile = cwd + '/' + outfile
+
+# for test, ignore search
+ignoreSearch = True
+
 makeRequest(
-    keyword = 'Jordan 4 pure money',
-    start = '01/20,2017',
-    end = '07/01,2017',
-    price = 200,
-    spuid = 11,
-    brand = 'Nike'
+    keyword = keyword,
+    start = start,
+    end = end,
+    price = price,
+    spuid = spuid,
+    brand = brand,
+    file = outfile
 )
+
+#conn = connection()
+#cursor = conn.cursor()
+
+#loadSQL = '''
+#LOAD DATA INFILE '{file}' INTO TABLE {table_name}
+#FIELDS TERMINATED BY '|'
+#ENCLOSED BY '"'
+#LINES TERMINATED BY '\n'
+#(keyword, product_name, deal_date, currency, deal_price, size_name, brand, size, size_id, deal_no, spu_id, aspect, content)
+#'''.format(
+#    file = outfile,
+#    table_name = table_name
+#)
+
+#print(loadSQL)
+
+#cursor.execute(loadSQL)
+close_db(conn)
+
