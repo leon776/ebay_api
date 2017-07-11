@@ -85,4 +85,5 @@ def main(argv):
 
     print(options)
 if __name__ == "__main__":
+    print('%02d' % 2)
     main(sys.argv[1:])

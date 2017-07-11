@@ -189,6 +189,7 @@ def searchWithSizes(
         keyword,
         spuid,
         brand,
+        table_name,
         file,
         page_number = 1
     ):
@@ -289,7 +290,7 @@ def searchWithSizes(
 '''
 @desc 发送请求
 '''
-def makeRequest(keyword, start, end, price, spuid, brand, file, page_number = 1):
+def makeRequest(keyword, start, end, price, spuid, brand, file, table_name = '', page_number = 1):
     url = makeURL(
         query_string = keyword,
         min_price = price,
@@ -338,6 +339,7 @@ def makeRequest(keyword, start, end, price, spuid, brand, file, page_number = 1)
                     spuid = spuid,
                     brand = brand,
                     page_number = page_number,
+                    table_name = table_name,
                     file = file
                 )
 
@@ -351,19 +353,21 @@ def makeRequest(keyword, start, end, price, spuid, brand, file, page_number = 1)
                     spuid = spuid,
                     brand = brand,
                     page_number = page_number,
+                    table_name = table_name,
                     file = file
                 )
 
             # Not Specified ??
 
 def runTask(options):
-
     keyword = options['keyword']
     start = options['start']
     end = options['end']
     price = options['price']
     spuid = options['spuid']
     brand = options['brand']
+
+    table_name = getTableName('ebay_spider_logs', int(spuid))
     cwd = os.getcwd()
     outfile = 'output_{spuid}_{start}_{end}_{price}.data'.format(
         spuid = spuid,
@@ -381,9 +385,13 @@ def runTask(options):
         price = price,
         spuid = spuid,
         brand = brand,
+        table_name = table_name,
         file = outfile,
     )
 
+def getTableName(table_name, spuid):
+   table_name = '%s_%02d' % (table_name, int(spuid % 10))
+   return table_name
 
 def main(argv):
     try:
@@ -407,6 +415,5 @@ def main(argv):
 if __name__ == "__main__":
     conn = connection()
     cursor = conn.cursor()
-    table_name = 'ebay_spider_logs'
     main(sys.argv[1:])
     conn.close()
