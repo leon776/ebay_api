@@ -250,7 +250,11 @@ def searchWithSizes(
                             records.append(rowDict)
                             insertSQL = 'INSERT INTO %s (keyword, product_name, deal_date, currency, deal_price, size_name, brand, size, size_id, deal_no, spu_id, aspect, content) VALUES ("%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s")' % (table_name, pymysql.escape_string(keyword), pymysql.escape_string(title), startTime, currencyId, currentPrice, name, brand, sizeValue, sizeValue, itemId, spuid, pymysql.escape_string(json.dumps(sizes, sort_keys = True)), pymysql.escape_string(json.dumps(record, sort_keys = True)))
                             print(insertSQL)
-                            cursor.execute(insertSQL)
+                            try:
+                                cursor.execute(insertSQL)
+                            except Exception as e:
+                                print('ignore the row')
+
                             spamwriter.writerow([
                                 keyword,
                                 title,
