@@ -287,7 +287,9 @@ def searchWithSizes(
                             keyword = keyword,
                             spuid = spuid,
                             brand = brand,
-                            page_number = page_number
+                            page_number = page_number,
+                            table_name = table_name,
+                            file = file
                         )
 
 '''
