@@ -216,7 +216,10 @@ def searchWithSizes(
                 entriesPerPage = int(paginationOutput['entriesPerPage'][0])
                 totalPages = int(paginationOutput['totalPages'][0])
                 totalEntries = int(paginationOutput['totalEntries'][0])
-                item = searchResult['item']
+              
+                item = []
+                if('item' in searchResult):
+                    item = searchResult['item']
 
                 print(paginationOutput, entriesPerPage, totalPages, totalEntries, item)
                 if(len(item) > 0):
