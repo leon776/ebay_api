@@ -10,6 +10,71 @@ import csv
 import json
 import pymysql
 import os
+import getopt
+
+
+def printUsage():
+    cmdText = 'Usage: command.py --k <keyword> -s <start> -e <end> -p <price> -i <spuid> -b <brand>'
+
+    print('-' * 100)
+    print('')
+    print(cmdText)
+    print('')
+    print('-' * 100)
+    print()
+    print()
+    print('-h, --help', '显示帮助')
+    print('-k, --keyword <keyword>', '搜索关键词, 关键词含空格，用引号引起来')
+    print('-s, --start <mm dd,yyyy>', '搜索的开始日期，格式为: mm dd,yyyy')
+    print('-e, --end <mm dd,yyyy>', '搜索的结束日期，格式为: mm dd,yyyy')
+    print('-p, --price <price>', '过滤的最低价，单位USD')
+    print('-i, --spuid <spuid>', 'spuid')
+    print('-b, --brand <brand>', 'brand name')
+    print()
+    print()
+
+def getOpts(opts):
+    keyword = None
+    start = None
+    end = None
+    price = None
+    spuid = None
+    brand = None
+
+    for opt, arg in opts:
+        if opt == '-h':
+            printUsage()
+            sys.exit()
+        elif opt in ("-k", "--keyword"):
+            keyword = arg
+        elif opt in ("-s", "--start"):
+            start = arg
+        elif opt in ("-e", "--end"):
+            end = arg
+        elif opt in ("-p", "--price"):
+            price = arg
+        elif opt in ("-i", "--spuid"):
+            spuid = arg
+        elif opt in ("-b", "--brand"):
+            brand = arg
+    if(
+        keyword is None or
+        start is None or
+        end is None or
+        price is None or
+        spuid is None or
+        brand is None
+    ):
+        return None
+    else:
+        return {
+            "keyword": keyword,
+            "start": start,
+            "end": end,
+            "price": price,
+            "spuid": spuid,
+            "brand": brand,
+        }
 
 def connection():
     db = pymysql.connect(
@@ -26,11 +91,6 @@ def connection():
 def close_db(db):
     db.close()
 
-
-table_name = 'ebay_spider_logs'
-
-conn = connection()
-cursor = conn.cursor()
 '''
 @desc 根据关键词、开始时间、结束时间、最低价等产生搜索URL
 @param query_sting String: 请求关键词
@@ -274,7 +334,7 @@ def makeRequest(keyword, start, end, price, spuid, brand, file, page_number = 1)
                     spuid = spuid,
                     brand = brand,
                     page_number = page_number,
-                    file = outfile
+                    file = file
                 )
 
             # 遍历欧码
@@ -287,57 +347,62 @@ def makeRequest(keyword, start, end, price, spuid, brand, file, page_number = 1)
                     spuid = spuid,
                     brand = brand,
                     page_number = page_number,
-                    file = outfile
+                    file = file
                 )
 
             # Not Specified ??
 
-keyword = 'Jordan 4 pure money'
-start = '01/20,2017'
-end = '07/01,2017'
-price = 200
-spuid = 11
-brand = 'Nike'
+def runTask(options):
 
-cwd = os.getcwd()
-outfile = 'output_{spuid}_{start}_{end}_{price}.data'.format(
-    spuid = spuid,
-    start = start,
-    end = end,
-    price = price,
-).replace(',', '').replace('/', '')
+    keyword = options['keyword']
+    start = options['start']
+    end = options['end']
+    price = options['price']
+    spuid = options['spuid']
+    brand = options['brand']
+    cwd = os.getcwd()
+    outfile = 'output_{spuid}_{start}_{end}_{price}.data'.format(
+        spuid = spuid,
+        start = start,
+        end = end,
+        price = price,
+    ).replace(',', '').replace('/', '')
 
-outfile = cwd + '/' + outfile
+    outfile = cwd + '/' + outfile
 
-# for test, ignore search
-ignoreSearch = True
+    makeRequest(
+        keyword = keyword,
+        start = start,
+        end = end,
+        price = price,
+        spuid = spuid,
+        brand = brand,
+        file = outfile,
+    )
 
-makeRequest(
-    keyword = keyword,
-    start = start,
-    end = end,
-    price = price,
-    spuid = spuid,
-    brand = brand,
-    file = outfile
-)
 
-#conn = connection()
-#cursor = conn.cursor()
+def main(argv):
+    try:
+        opts, args = getopt.getopt(argv, "hk:s:e:p:i:b:", ["ifile=", "ofile="])
+    except getopt.GetoptError:
+        printUsage()
+        sys.exit(2)
 
-#loadSQL = '''
-#LOAD DATA INFILE '{file}' INTO TABLE {table_name}
-#FIELDS TERMINATED BY '|'
-#ENCLOSED BY '"'
-#LINES TERMINATED BY '\n'
-#(keyword, product_name, deal_date, currency, deal_price, size_name, brand, size, size_id, deal_no, spu_id, aspect, content)
-#'''.format(
-#    file = outfile,
-#    table_name = table_name
-#)
+    if(len(opts) == 0):
+        printUsage()
+        sys.exit(2)
 
-#print(loadSQL)
+    options = getOpts(opts)
+    if(options is None):
+        printUsage()
+        sys.exit(2)
 
-#cursor.execute(loadSQL)
-close_db(conn)
+    runTask(options)
 
+
+if __name__ == "__main__":
+    conn = connection()
+    cursor = conn.cursor()
+    table_name = 'ebay_spider_logs'
+    main(sys.argv[1:])
+    conn.close()
