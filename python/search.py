@@ -221,7 +221,7 @@ def searchWithSizes(
                 print(paginationOutput, entriesPerPage, totalPages, totalEntries, item)
                 if(len(item) > 0):
                     with open(file, 'a+') as csvfile:
-                        spamwriter = csv.writer(csvfile, delimiter = '|')
+                        spamwriter = csv.writer(csvfile)
                         for index, record in enumerate(item):
                             itemId = record['itemId'][0]
                             listingInfo = record['listingInfo'][0]
@@ -376,7 +376,7 @@ def runTask(options):
         price = price,
     ).replace(',', '').replace('/', '')
 
-    outfile = cwd + '/' + outfile
+    outfile = cwd + '/datas/' + outfile
 
     makeRequest(
         keyword = keyword,
