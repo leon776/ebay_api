@@ -68,13 +68,6 @@ def getOpts(opts):
         }
 
 def main(argv):
-    keyword = None
-    start = None
-    end = None
-    price = None
-    spuid = None
-    brand = None
-
     try:
         opts, args = getopt.getopt(argv, "hk:s:e:p:i:b:", ["ifile=", "ofile="])
     except getopt.GetoptError:
