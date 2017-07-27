@@ -28,6 +28,12 @@ textEURO = "Euro Size"
 newWithBox = 'New with box'
 cwd = os.path.split(os.path.realpath(__file__))[0]
 
+DB_HOST = '127.0.0.1'
+DB_USER = 'dev'
+DB_PASS = 'dev@2017'
+DB_NAME = 'shoes'
+DB_PORT = 3306
+DB_CHARSET = 'utf8mb4'
 
 # 暂时废弃
 records = {}
@@ -121,12 +127,12 @@ def connection():
     # ALTER DATABASE shoes CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci;
     # https://stackoverflow.com/questions/20411440/incorrect-string-value-xf0-x9f-x8e-xb6-xf0-x9f-mysql
     db = pymysql.connect(
-        host = "127.0.0.1",
-        port = 3306,
-        user = "dev",
-        password = "dev@2017",
-        db = "shoes",
-        charset = 'utf8mb4', # Exception when insert, not sure why
+        host = DB_HOST,
+        port = DB_PORT,
+        user = DB_USER,
+        password = DB_PASS,
+        db = DB_NAME,
+        charset = DB_CHARSET, # Exception when insert, not sure why
         cursorclass = pymysql.cursors.DictCursor,
     )
 
