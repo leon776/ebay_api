@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" integrity="sha512-dTfge/zgoMYpP7QbHy4gWMEGsbsdZeCXz7irItjcC3sPUFtf0kuFbDz/ixG7ArTxmDjLXDmezHubeNikyKGVyQ==" crossorigin="anonymous">
+	<title>Taobao Spider</title>
+</head>
+<body>
+	<div class="container">
+		<h1>Taobao Spider</h1>
+		<div class="form-horizontal">
+			<div class="form-group">
+	    		<label class="col-sm-2 control-label">Shop</label>
+	    		<div class="col-sm-10">
+					<select class="form-control" id="shopSelect"></select>
+				</div>
+			</div>
+			<div class="form-group">
+	    		<label class="col-sm-2 control-label">Fetching next</label>
+	    		<div class="col-sm-10">
+	    			<input id="nextPageInput" class="form-control" type="number" min="1" max="42" value="1" style="width: 80px;">
+	    		</div>
+	    	</div>
+	    	<div class="form-group">
+	    		<div class="col-sm-offset-2 col-sm-10">
+					<button id="fetchBtn" class="btn btn-default" onclick="fetch()">Fetch One Page</button>
+					<button id="startBtn" class="btn btn-default" onclick="start()">Start</button>
+					<button id="stopBtn" class="btn btn-default disabled" onclick="stop()">Stop</button>
+				</div>
+			</div>
+		</div>
+		<h3>Instructions</h3>
+		<ol>
+			<li>Login to Taobao with the <b>SAME</b> browser.</li>
+			<li>Choose the shop you want to crawl.</li>
+			<li>Select a page to fetch. In most cases, you want to fetch from page 1.</li>
+			<li>Click "Start".</li>
+			<li>The crawler will start fetching, and the page number will increase automatically. Each page will be downloaded as a .htm file.</li>
+			<li>Next page will be fetched after 5 minutes.
+			<li>The crawler will stop automatically after 42 pages. You can click "Stop" to stop earlier.</li>
+		</ol>
+		<h3>Warning</h3>
+		<ul>
+			<li>Do not browse Taobao when using this crawler.</li>
+			<li>Do not use 2 crawlers at the same time.</li>
+			<li>Crawling too frequently will make Taobao put you into jail. And you will have to wait a much longer time before you can crawl again. Trust me, 5 minutes is optimal.</li>
+			<li>If no file is downloaded, you are probably in jail. Stop the crawler. Wait for 15 minutes until you start again. Make sure you're not using 2 crawlers or browsing Taobao.</li>
+		</ul>
+		<iframe id="downloadIframe" style="display: none;"></iframe>
+	</div>
+</body>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="scripts/script.js"></script>
+</html>
